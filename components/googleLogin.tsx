@@ -3,6 +3,7 @@ import { Button, View, Text, Alert } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import { makeRedirectUri } from "expo-auth-session";
+import { GOOGLE_AUTH_WEB_CLIENT_ID } from "@/constants/apikeys";
 
 // Make sure to complete the auth session
 WebBrowser.maybeCompleteAuthSession();
@@ -10,7 +11,7 @@ WebBrowser.maybeCompleteAuthSession();
 export default function GoogleLogin() {
   // Replace with your Google OAuth Client ID
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: process.env.GOOGLE_AUTH_WEB_CLIENT_ID, // Use the web client ID here
+    clientId: GOOGLE_AUTH_WEB_CLIENT_ID, // Use the web client ID here
     redirectUri: makeRedirectUri({}),
   });
 

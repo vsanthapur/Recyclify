@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Loader } from "@googlemaps/js-api-loader"; // Google Maps loader
-import GoogleMapComponent from "@/components/GoogleMapComponent"; // Import GoogleMapComponent
+import { REACT_APP_GOOGLE_API_KEY } from "@/constants/apikeys";
 
 const ExplorePage: React.FC = () => {
   const [userLocation, setUserLocation] = useState<{
@@ -11,7 +11,7 @@ const ExplorePage: React.FC = () => {
 
   // Google Maps loader with API key
   const loader = new Loader({
-    apiKey: process.env.REACT_APP_GOOGLE_API_KEY!,
+    apiKey: REACT_APP_GOOGLE_API_KEY!,
     libraries: ["places"],
   });
 
