@@ -1,191 +1,344 @@
-import React, { useState, useRef } from "react";
-import { View, Button, Image, Text, Platform, StyleSheet } from "react-native";
-import { launchCamera, launchImageLibrary } from "react-native-image-picker";
+"use client";
 
-const UploadOrTakePicture = () => {
-  const [imageUri, setImageUri] = useState<string | null>(null);
+import React, { useState, useRef, useEffect, CSSProperties } from "react";
+import { FaCamera, FaUpload, FaUndo, FaCheck } from "react-icons/fa";
+import { Alert } from "react-native";
+import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { OPEN_AI_API_KEY } from "@/constants/apikeys";
+
+const styles: { [key: string]: CSSProperties } = {
+  container: {
+    width: "100%",
+    maxWidth: "400px",
+    margin: "0 auto",
+    backgroundColor: "white",
+    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+    borderRadius: "8px",
+    overflow: "hidden",
+  },
+  content: {
+    padding: "24px",
+  },
+  resultBanner: {
+    marginBottom: "16px",
+    padding: "8px",
+    textAlign: "center",
+    color: "white",
+    fontWeight: "bold",
+    borderRadius: "4px",
+  },
+  video: {
+    width: "100%",
+    borderRadius: "4px",
+  },
+  buttonContainer: {
+    position: "relative",
+    marginTop: "16px",
+    display: "flex",
+    justifyContent: "center",
+  },
+  iconButton: {
+    backgroundColor: "#22c55e",
+    color: "white",
+    border: "none",
+    borderRadius: "50%",
+    padding: "12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "background-color 0.3s",
+  },
+  captureButton: {
+    position: "absolute",
+    bottom: "16px",
+    left: "50%",
+    transform: "translateX(-50%)",
+  },
+  outlineButton: {
+    backgroundColor: "white",
+    color: "#22c55e",
+    border: "2px solid #22c55e",
+  },
+  image: {
+    width: "100%",
+    marginBottom: "16px",
+    borderRadius: "4px",
+  },
+  buttonGroup: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "16px",
+  },
+};
+
+export default function RecyclableChecker() {
+  const [image, setImage] = useState<string | null>(null);
+  const [base64Image, setBase64Image] = useState<string | null>(null);
+  const [isRecyclable, setIsRecyclable] = useState<boolean | null>(null);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Reset image and video feed
-  const handleRetake = () => {
-    setImageUri(null); // Reset the image
-    if (videoRef.current && Platform.OS === "web") {
-      handleStartCameraWeb(); // Restart camera on web if it was previously used
+  // Function to retrieve session data (email, name)
+  const getSession = async () => {
+    try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      if (accessToken) {
+        // Fetch user info from Google
+        const userInfoResponse = await fetch(
+          "https://www.googleapis.com/userinfo/v2/me",
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+        const userInfo = await userInfoResponse.json();
+        setEmail(userInfo.email);
+        setName(userInfo.name);
+      }
+    } catch (error) {
+      console.error("Error fetching session:", error);
     }
   };
 
-  // === Mobile handlers ===
-  const handleTakePictureMobile = () => {
-    launchCamera({ mediaType: "photo", saveToPhotos: true }, (response) => {
-      if (response.didCancel) {
-        console.log("User cancelled image picker");
-      } else if (response.errorCode) {
-        console.log("Error: ", response.errorMessage);
-      } else if (response.assets && response.assets[0].uri) {
-        setImageUri(response.assets[0].uri); // Save the image URI for further processing
-      }
-    });
+  useEffect(() => {
+    handleCameraAccess();
+    getSession(); // Fetch session when component mounts
+  }, []);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageDataUrl = e.target?.result as string;
+        setImage(imageDataUrl); // Set the image for display
+        convertToBase64(imageDataUrl); // Convert to base64 and setBase64Image
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const handleChooseFileMobile = () => {
-    launchImageLibrary({ mediaType: "photo" }, (response) => {
-      if (response.didCancel) {
-        console.log("User cancelled file picker");
-      } else if (response.errorCode) {
-        console.log("Error: ", response.errorMessage);
-      } else if (response.assets && response.assets[0].uri) {
-        setImageUri(response.assets[0].uri); // Save the file URI for further processing
-      }
-    });
-  };
-
-  // === Web handlers ===
-  const handleStartCameraWeb = async () => {
+  const handleCameraAccess = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        setIsCameraReady(true);
       }
     } catch (err) {
-      console.error("Error accessing camera:", err);
+      console.error("Error accessing the camera", err);
     }
   };
 
-  const handleTakePictureWeb = () => {
-    if (videoRef.current && canvasRef.current) {
-      const context = canvasRef.current.getContext("2d");
-      if (context) {
-        context.drawImage(
-          videoRef.current,
-          0,
-          0,
-          canvasRef.current.width,
-          canvasRef.current.height
-        );
-        const imageUrl = canvasRef.current.toDataURL("image/png");
-        setImageUri(imageUrl); // Save the captured image for further processing
-        if (videoRef.current.srcObject) {
-          const tracks = (
-            videoRef.current.srcObject as MediaStream
-          ).getTracks();
-          tracks.forEach((track) => track.stop()); // Stop the video stream
-        }
+  const handleCapture = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement("canvas");
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      canvas.getContext("2d")?.drawImage(videoRef.current, 0, 0);
+      setImage(canvas.toDataURL("image/jpeg"));
+      convertToBase64(canvas.toDataURL("image/jpeg"));
+      // Stop the video stream
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      setIsCameraReady(false);
+    }
+  };
+
+  const handleRetake = () => {
+    setImage(null);
+    setIsRecyclable(null);
+    setBase64Image(null);
+    handleCameraAccess();
+  };
+
+  const handleConfirm = async () => {
+    if (base64Image) {
+      try {
+        const gptResponse = await analyzeImageWithOpenAI(base64Image);
+        console.log("ggggg", gptResponse);
+        await uploadImageToBackend(base64Image, gptResponse);
+      } catch (error) {
+        Alert.alert("Error");
       }
+    } else {
+      Alert.alert("No image", "Please select or take an image first.");
     }
   };
 
-  const handleChooseFileWeb = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const uri = URL.createObjectURL(file); // Convert file to a local object URL
-      setImageUri(uri);
+  const convertToBase64 = async (uri: string) => {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64data = reader.result as string;
+        setBase64Image(base64data);
+      };
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      console.error("Error converting image to base64:", error);
+    }
+  };
+
+  const analyzeImageWithOpenAI = async (imageUrl: string) => {
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPEN_AI_API_KEY}`,
+    };
+
+    const prompt = `text: "You are a recycling app. Tell users what is recyclable or not. 
+You also tell what materials are in the item. 
+The format should be:
+{
+  \\"item\\": \\"metal bottle\\",
+  \\"recyclable\\": true,
+  \\"materials\\": [
+    {
+      \\"material\\": \\"aluminum\\"
+    },
+    {
+      \\"material\\": \\"steel\\"
+    }
+  ],
+  \\"description\\": \\"Metal bottles made from aluminum and stainless steel are generally recyclable. Ensure the bottle is empty and clean before placing it in the recycling bin.\\"
+}
+Try to keep the materials only one word common materials but like if something has several materials plz list
+Respond in json only. Don't add like \`\`\`json or anything, just pure json format. 
+If the user enters something they shouldnt like a selfie then just say false but be funny like
+materials say human and then description say you are not recyable. Keep in mind tho sometimes it may
+look like a selfie if they are showing something in their hand in that case it is not a selfie
+this is like one instance there. I REPEAT IF THEY ARE HOLDING SOMETHING THEN ANALYZE WHAT THEY ARE HOLDING
+are several things users shouldnt upload be funny with it.
+ONLY JSON PLZ THE WORLD IS IN DANGER IF NOT"`;
+
+    const payload = {
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    };
+
+    try {
+      const response = await fetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: headers,
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await response.json();
+      const content = data.choices[0].message.content;
+
+      const parsedContent = JSON.parse(content);
+      const recyclable = parsedContent.recyclable;
+      setIsRecyclable(recyclable);
+      return parsedContent;
+    } catch (error) {
+      console.error("Error analyzing image with OpenAI:", error);
+      Alert.alert("Error analyzing the image");
+      throw error;
+    }
+  };
+
+  const uploadImageToBackend = async (base64Image: any, gptResponse: any) => {
+    try {
+      const response = await axios.post("http://localhost:8081/upload-image", {
+        email: email,
+        base64Image: base64Image,
+        apiResponse: gptResponse, // Add the GPT response here
+      });
+
+      if (response.data.message === "Image uploaded successfully") {
+        console.log(
+          "Image and GPT response uploaded successfully",
+          response.data.image
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Error uploading image and GPT response to backend:",
+        error
+      );
     }
   };
 
   return (
-    <View style={styles.container}>
-      {/* Web */}
-      {Platform.OS === "web" ? (
-        <>
-          {!imageUri && (
-            <>
-              <video ref={videoRef} style={styles.video} />
-              <canvas
-                ref={canvasRef}
-                style={{ display: "none" }}
-                width={300}
-                height={300}
-              />
-            </>
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleChooseFileWeb}
-            style={styles.input}
-          />
-        </>
-      ) : (
-        <>
-          {/* Mobile */}
-          {!imageUri && (
-            <>
-              <Button
-                title="Take a Picture"
-                onPress={handleTakePictureMobile}
-              />
-              <Button
-                title="Choose from Library"
-                onPress={handleChooseFileMobile}
-              />
-            </>
-          )}
-        </>
-      )}
+    <div style={styles.container}>
+      <div style={styles.content}>
+        {isRecyclable !== null && (
+          <div
+            style={{
+              ...styles.resultBanner,
+              backgroundColor: isRecyclable ? "#22c55e" : "#ef4444",
+            }}
+          >
+            {isRecyclable ? "Recyclable" : "Not Recyclable"}
+          </div>
+        )}
 
-      {/* Display selected image */}
-      {imageUri && (
-        <>
-          <Text style={styles.text}>Selected Image:</Text>
-          <Image source={{ uri: imageUri }} style={styles.image} />
-        </>
-      )}
-
-      {/* Buttons positioned at the bottom */}
-      <View style={styles.buttonContainer}>
-        {!imageUri ? (
+        {!image ? (
           <>
-            {Platform.OS === "web" && !imageUri && (
-              <>
-                <Button title="Access Camera" onPress={handleStartCameraWeb} />
-                <Button title="Take Picture" onPress={handleTakePictureWeb} />
-              </>
-            )}
+            <div style={{ position: "relative" }}>
+              <video ref={videoRef} style={styles.video} autoPlay playsInline />
+              {isCameraReady && (
+                <button
+                  style={{ ...styles.iconButton, ...styles.captureButton }}
+                  onClick={handleCapture}
+                  aria-label="Take Picture"
+                >
+                  <FaCamera size={24} />
+                </button>
+              )}
+            </div>
+            <div style={styles.buttonContainer}>
+              <button
+                style={styles.iconButton}
+                onClick={() => fileInputRef.current?.click()}
+                aria-label="Upload File"
+              >
+                <FaUpload size={24} />
+              </button>
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              style={{ display: "none" }}
+              accept="image/*"
+              onChange={handleFileUpload}
+            />
           </>
         ) : (
           <>
-            <Button title="Retake" onPress={handleRetake} />
+            <img src={image} alt="Captured" style={styles.image} />
+            <div style={styles.buttonGroup}>
+              <button
+                style={{ ...styles.iconButton, ...styles.outlineButton }}
+                onClick={handleRetake}
+                aria-label="Retake"
+              >
+                <FaUndo size={24} />
+              </button>
+              <button
+                style={styles.iconButton}
+                onClick={handleConfirm}
+                aria-label="Confirm"
+              >
+                <FaCheck size={24} />
+              </button>
+            </div>
           </>
         )}
-      </View>
-    </View>
+      </div>
+    </div>
   );
-};
-
-// Styles
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  video: {
-    width: 300,
-    height: 300,
-    marginTop: 10,
-  },
-  image: {
-    width: 200,
-    height: 200,
-    marginTop: 20,
-  },
-  text: {
-    marginTop: 10,
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  buttonContainer: {
-    position: "absolute",
-    bottom: 30,
-    width: "100%",
-    flexDirection: "row",
-    justifyContent: "space-evenly",
-  },
-  input: {
-    marginTop: 10,
-  },
-});
-
-export default UploadOrTakePicture;
+}

@@ -32,8 +32,10 @@ export default function TabLayout() {
       if (token) {
         setIsLoggedIn(true); // User is logged in
       } else {
-        // If not logged in, redirect to GoogleLogin screen
-        router.replace("/GoogleLogin");
+        // Make sure to navigate only when the component is mounted
+        if (router) {
+          router.replace("/GoogleLogin");
+        }
       }
       setLoading(false); // Stop the loading indicator
     };
@@ -99,7 +101,7 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="four"
+          name="settings"
           options={{
             title: " ",
             tabBarIcon: ({ color }) => <TabBarIcon name="cog" color={color} />, // You can change the icon here
