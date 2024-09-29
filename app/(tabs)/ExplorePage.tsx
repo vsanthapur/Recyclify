@@ -1,41 +1,95 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, StyleSheet } from "react-native";
 import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
-import Geolocation from "react-native-geolocation-service";
 import { REACT_APP_GOOGLE_API_KEY } from "@/constants/apikeys";
+
+const GOOGLE_MAPS_API_KEY = REACT_APP_GOOGLE_API_KEY;
 
 const mapContainerStyle = {
   width: "100%",
   height: "50vh",
+  borderRadius: "8px",
+  marginBottom: "16px",
 };
 
-const libraries = ["places"];
+const styles: { [key: string]: React.CSSProperties } = {
+  container: {
+    width: "100%",
+    maxWidth: "600px",
+    margin: "0 auto",
+    backgroundColor: "white",
+    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+    borderRadius: "8px",
+    overflow: "hidden",
+  },
+  content: {
+    padding: "24px",
+  },
+  header: {
+    fontSize: "18px",
+    fontWeight: "bold",
+    marginBottom: "16px",
+    color: "#333",
+  },
+  listContainer: {
+    maxHeight: "50vh",
+    overflowY: "auto",
+  },
+  stationItem: {
+    padding: "12px",
+    borderBottom: "1px solid #e5e5e5",
+    cursor: "pointer",
+  },
+  stationName: {
+    fontSize: "16px",
+    fontWeight: "bold",
+    marginBottom: "4px",
+    color: "#22c55e",
+  },
+  stationAddress: {
+    fontSize: "14px",
+    color: "#666",
+  },
+  loadingText: {
+    textAlign: "center",
+    padding: "20px",
+    fontSize: "16px",
+    color: "#666",
+  },
+};
 
-const ExplorePage: React.FC = () => {
+export default function RecyclingLocator() {
   const [currentLocation, setCurrentLocation] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
   const [recyclingStations, setRecyclingStations] = useState<any[]>([]);
+  const [selectedStation, setSelectedStation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: REACT_APP_GOOGLE_API_KEY, // Add your API Key here
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: ["places"],
   });
 
   useEffect(() => {
-    // Get user's current location
-    Geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setCurrentLocation({ lat: latitude, lng: longitude });
-        fetchRecyclingStations(latitude, longitude); // Fetch recycling stations
-      },
-      (error) => {
-        console.error(error);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setCurrentLocation({ lat: latitude, lng: longitude });
+          fetchRecyclingStations(latitude, longitude);
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+        }
+      );
+    } else {
+      console.error("Geolocation is not supported by this browser.");
+    }
   }, []);
 
   const fetchRecyclingStations = async (lat: number, lng: number) => {
@@ -45,7 +99,7 @@ const ExplorePage: React.FC = () => {
 
     const request = {
       location: new googleMaps.LatLng(lat, lng),
-      radius: 10000, // 5 km radius
+      radius: 10000,
       keyword: "recycling station",
     };
 
@@ -58,73 +112,52 @@ const ExplorePage: React.FC = () => {
     });
   };
 
-  if (loadError) return <Text>Error loading maps</Text>;
-  if (!isLoaded) return <Text>Loading maps...</Text>;
+  const handleStationClick = (station: any) => {
+    setSelectedStation({
+      lat: station.geometry.location.lat(),
+      lng: station.geometry.location.lng(),
+    });
+  };
+
+  if (loadError)
+    return <div style={styles.loadingText}>Error loading maps</div>;
+  if (!isLoaded) return <div style={styles.loadingText}>Loading maps...</div>;
 
   return (
-    <View style={styles.container}>
-      {currentLocation && (
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={currentLocation}
-          zoom={14}
-        >
-          <Marker position={currentLocation} label="You" />
+    <div style={styles.container}>
+      <div style={styles.content}>
+        {currentLocation && (
+          <GoogleMap
+            mapContainerStyle={mapContainerStyle}
+            center={selectedStation || currentLocation}
+            zoom={selectedStation ? 16 : 14}
+          >
+            <Marker position={currentLocation} />
+            {recyclingStations.map((station) => (
+              <Marker
+                key={station.place_id}
+                position={{
+                  lat: station.geometry.location.lat(),
+                  lng: station.geometry.location.lng(),
+                }}
+              />
+            ))}
+          </GoogleMap>
+        )}
+        <h2 style={styles.header}>Top 5 Recycling Stations Near You</h2>
+        <div style={styles.listContainer}>
           {recyclingStations.map((station) => (
-            <Marker
+            <div
               key={station.place_id}
-              position={{
-                lat: station.geometry.location.lat(),
-                lng: station.geometry.location.lng(),
-              }}
-              label={station.name}
-            />
+              style={styles.stationItem}
+              onClick={() => handleStationClick(station)}
+            >
+              <div style={styles.stationName}>{station.name}</div>
+              <div style={styles.stationAddress}>{station.vicinity}</div>
+            </div>
           ))}
-        </GoogleMap>
-      )}
-
-      <View style={styles.listContainer}>
-        <Text style={styles.header}>Top 5 Recycling Stations Near You</Text>
-        <FlatList
-          data={recyclingStations}
-          keyExtractor={(item) => item.place_id}
-          renderItem={({ item }) => (
-            <View style={styles.stationItem}>
-              <Text style={styles.stationName}>{item.name}</Text>
-              <Text>{item.vicinity}</Text>
-            </View>
-          )}
-        />
-      </View>
-    </View>
+        </div>
+      </div>
+    </div>
   );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
-  },
-  mapContainer: {
-    width: "100%",
-    height: "50%",
-  },
-  listContainer: {
-    marginTop: 20,
-    flex: 1,
-  },
-  header: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  stationItem: {
-    marginBottom: 15,
-  },
-  stationName: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-});
-
-export default ExplorePage;
+}

@@ -62,7 +62,7 @@ export default function TabLayout() {
         }}
       >
         <Tabs.Screen
-          name="index"
+          name="charts"
           options={{
             title: " ",
             tabBarIcon: ({ color }) => (
@@ -85,7 +85,7 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="camera"
+          name="index"
           options={{
             title: " ",
             tabBarIcon: ({ color }) => (
