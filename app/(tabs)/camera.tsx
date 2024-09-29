@@ -212,7 +212,7 @@ Respond in json only. Don't add like \`\`\`json or anything, just pure json form
 If the user enters something they shouldnt like a selfie then just say false but be funny like
 materials say human and then description say you are not recyable. Keep in mind tho sometimes it may
 look like a selfie if they are showing something in their hand in that case it is not a selfie
-this is like one instance there. I REPEAT IF THEY ARE HOLDING SOMETHING THEN ANALYZE WHAT THEY ARE HOLDING
+this is like one instance there. I REPEAT IF THEY ARE HOLDING SOMETHING THEN ANALYZE WHAT THEY ARE
 are several things users shouldnt upload be funny with it.
 ONLY JSON PLZ THE WORLD IS IN DANGER IF NOT"`;
 
