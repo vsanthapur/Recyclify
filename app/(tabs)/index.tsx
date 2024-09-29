@@ -2,7 +2,12 @@
 
 import React, { useState, useRef, useEffect, CSSProperties } from "react";
 import { FaCamera, FaUpload, FaUndo, FaCheck } from "react-icons/fa";
-import { Alert } from "react-native";
+import {
+  Alert,
+  ActivityIndicator,
+  View,
+  SectionListComponent,
+} from "react-native";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { OPEN_AI_API_KEY } from "@/constants/apikeys";
@@ -77,6 +82,11 @@ export default function RecyclableChecker() {
   const [image, setImage] = useState<string | null>(null);
   const [base64Image, setBase64Image] = useState<string | null>(null);
   const [isRecyclable, setIsRecyclable] = useState<boolean | null>(null);
+  const [description, setDescription] = useState<string | null>(null);
+  const [item, setItem] = useState<string | null>(null);
+  const [materials, setMaterials] = useState<string[]>([]);
+  const [points, setPoints] = useState<number | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
@@ -88,7 +98,6 @@ export default function RecyclableChecker() {
     try {
       const accessToken = await AsyncStorage.getItem("accessToken");
       if (accessToken) {
-        // Fetch user info from Google
         const userInfoResponse = await fetch(
           "https://www.googleapis.com/userinfo/v2/me",
           {
@@ -152,18 +161,24 @@ export default function RecyclableChecker() {
   const handleRetake = () => {
     setImage(null);
     setIsRecyclable(null);
+    setDescription(null);
+    setMaterials([]);
+    setPoints(null);
     setBase64Image(null);
     handleCameraAccess();
+    setItem(null);
   };
 
   const handleConfirm = async () => {
     if (base64Image) {
+      setLoading(true); // Start loading spinner
       try {
         const gptResponse = await analyzeImageWithOpenAI(base64Image);
-        console.log("ggggg", gptResponse);
         await uploadImageToBackend(base64Image, gptResponse);
       } catch (error) {
         Alert.alert("Error");
+      } finally {
+        setLoading(false); // Stop loading spinner
       }
     } else {
       Alert.alert("No image", "Please select or take an image first.");
@@ -191,38 +206,39 @@ export default function RecyclableChecker() {
       Authorization: `Bearer ${OPEN_AI_API_KEY}`,
     };
 
-    const prompt = `text: "You are a recycling app. Tell users what is recyclable or not. 
-    You also tell what materials are in the item. 
-    The format should be:
-    {
-      \\"item\\": \\"metal bottle\\",
-      \\"recyclable\\": true,
-      \\"materials\\": [
-        {
-          \\"material\\": \\"aluminum\\"
-        },
-        {
-          \\"material\\": \\"steel\\"
-        }
-      ],
-      \\"description\\": \\"Metal bottles made from aluminum and stainless steel are generally recyclable. 
-      Ensure the bottle is empty and clean before placing it in the recycling bin.\\",
-      \\"Points\\": \\"Based on how environmentally friendly the item is to recycle or trash and scale (how much of it),
-      give a score 0-10, 0 being recycling it makes no impact while 10 makes a lot of impact. For example, a bottle cap
-      vs electronics. Keep in mind factors such as scale, impact, and if this item is recycled often or not. This should
-      be an int value.\\"
-    }
-    Try to keep the materials one word, but if an item has several materials, please list them. For the
-    description, please keep it one to two lines short, make it educational but slightly witty too. If a user sends something 
-    irrelevant, just say \\"material\\": \\"human\\" or something funny if it is a human.
-    ONLY JSON PLEASE, THE WORLD IS IN DANGER IF NOT. DO NOT RESPOND WITH \\"HERE IS YOUR JSON\\", \\"JSON\\", \`\`\` OR ANYTHING."`;
+    const prompt = `You are a recycling app. Analyze items to tell if they are recyclable and what materials they are made of. 
+Respond in this JSON format:
+{
+  "item": "metal bottle",
+  "recyclable": true,
+  "materials": [
+    { "material": "aluminum" },
+    { "material": "steel" }
+  ],
+  "description": "Metal bottles made from aluminum and steel are recyclable. Empty and clean before recycling.",
+  "points": 7
+}
+The score (1-10) reflects the recycling impact: larger items = higher impact, smaller = lower. Be witty in the description.
+If the user uploads irrelevant items (like a selfie), return "recyclable": false, "materials": "human", and add a funny comment like "You are not recyclable."
+Return **only** JSON; no extra text.`;
 
     const payload = {
       model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
-          content: prompt,
+          content: [
+            {
+              type: "text",
+              text: prompt,
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `${imageUrl}`,
+              },
+            },
+          ],
         },
       ],
     };
@@ -241,8 +257,12 @@ export default function RecyclableChecker() {
       const content = data.choices[0].message.content;
 
       const parsedContent = JSON.parse(content);
-      const recyclable = parsedContent.recyclable;
-      setIsRecyclable(recyclable);
+      setIsRecyclable(parsedContent.recyclable);
+      setDescription(parsedContent.description);
+      setMaterials(parsedContent.materials.map((m: any) => m.material));
+      setPoints(parsedContent.points);
+      setItem(parsedContent.item);
+
       return parsedContent;
     } catch (error) {
       console.error("Error analyzing image with OpenAI:", error);
@@ -273,6 +293,15 @@ export default function RecyclableChecker() {
     }
   };
 
+  if (loading) {
+    // Show loading spinner while checking the OpenAI API response
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   return (
     <div style={styles.container}>
       <div style={styles.content}>
@@ -285,6 +314,34 @@ export default function RecyclableChecker() {
           >
             {isRecyclable ? "Recyclable" : "Not Recyclable"}
           </div>
+        )}
+
+        {item && (
+          <p>
+            <strong>Item: </strong>
+            {item}
+          </p>
+        )}
+
+        {description && (
+          <p>
+            <strong>Description: </strong>
+            {description}
+          </p>
+        )}
+
+        {materials.length > 0 && (
+          <p>
+            <strong>Materials: </strong>
+            {materials.join(", ")}
+          </p>
+        )}
+
+        {points !== null && (
+          <p>
+            <strong>Recycling Points: </strong>
+            {points}
+          </p>
         )}
 
         {!image ? (

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
 import { REACT_APP_GOOGLE_API_KEY } from "@/constants/apikeys";
 
+// Replace with your actual Google Maps API key
 const GOOGLE_MAPS_API_KEY = REACT_APP_GOOGLE_API_KEY;
 
 const mapContainerStyle = {
@@ -105,7 +106,7 @@ export default function RecyclingLocator() {
 
     service.nearbySearch(request, (results: any, status: any) => {
       if (status === googleMaps.places.PlacesServiceStatus.OK) {
-        setRecyclingStations(results.slice(0, 5)); // Get top 5 results
+        setRecyclingStations(results.slice(0, 10));
       } else {
         console.error("PlacesService Error:", status);
       }

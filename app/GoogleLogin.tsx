@@ -1,21 +1,22 @@
 import React, { useEffect, useLayoutEffect } from "react";
-import { Button, View, Text, Alert } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import { makeRedirectUri } from "expo-auth-session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router"; // Use router for navigation
-import axios from "axios"; // Import axios for backend requests
-import { GOOGLE_AUTH_WEB_CLIENT_ID } from "@/constants/apikeys"; // Replace with your correct key path
-import { useNavigation } from "@react-navigation/native"; // Import for setting header options
+import { useRouter } from "expo-router";
+import axios from "axios";
+import { GOOGLE_AUTH_WEB_CLIENT_ID } from "@/constants/apikeys";
+import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function GoogleLogin() {
-  const router = useRouter(); // Use router for navigation
-  const navigation = useNavigation(); // For setting header options
+  const router = useRouter();
+  const navigation = useNavigation();
 
-  // Hide the header when the component is mounted
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
@@ -28,12 +29,10 @@ export default function GoogleLogin() {
   useEffect(() => {
     if (response?.type === "success" && response.authentication) {
       const { authentication } = response;
-      console.log("Authentication Access Token:", authentication.accessToken); // Log token for debugging
+      console.log("Authentication Access Token:", authentication.accessToken);
 
-      // Store the access token in AsyncStorage
       AsyncStorage.setItem("accessToken", authentication.accessToken)
         .then(() => {
-          // Fetch Google User Info
           fetch("https://www.googleapis.com/userinfo/v2/me", {
             headers: { Authorization: `Bearer ${authentication.accessToken}` },
           })
@@ -41,22 +40,19 @@ export default function GoogleLogin() {
             .then((userInfo) => {
               console.log("User Info:", userInfo);
 
-              // Send the user info to the backend using axios
               return axios.post("http://localhost:8081/login", {
                 email: userInfo.email,
                 name: userInfo.name,
               });
             })
             .then((res) => {
-              // Handle the response from the backend
               if (res.data.message === "new") {
                 console.log("User created", `Welcome, ${res.data.user.name}`);
               } else if (res.data.message === "existing") {
                 console.log("Welcome back", `${res.data.user.name}`);
               }
 
-              Alert.alert("Logged In", "Redirecting...");
-              router.push("/(tabs)"); // Navigate to the main app (tabs)
+              router.push("/(tabs)");
             })
             .catch((err) => console.error("Error during login process:", err));
         })
@@ -65,13 +61,75 @@ export default function GoogleLogin() {
   }, [response, router]);
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text style={{ fontSize: 24, marginBottom: 20 }}>Google Sign-In</Text>
-      <Button
-        disabled={!request}
-        title="Sign in with Google"
-        onPress={() => promptAsync()} // Trigger Google login
-      />
-    </View>
+    <LinearGradient
+      colors={["#E8F5E9", "#C8E6C9", "#A5D6A7"]}
+      style={styles.background}
+    >
+      <View style={styles.container}>
+        <View style={styles.logoContainer}>
+          <Ionicons name="leaf" size={80} color="#4CAF50" />
+        </View>
+        <Text style={styles.title}>Recyclify</Text>
+        <Text style={styles.subtitle}>Join the green revolution!</Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => promptAsync()}
+          disabled={!request}
+        >
+          <Ionicons
+            name="logo-google"
+            size={24}
+            color="white"
+            style={styles.buttonIcon}
+          />
+          <Text style={styles.buttonText}>Sign in with Google</Text>
+        </TouchableOpacity>
+      </View>
+    </LinearGradient>
   );
 }
+
+const styles = StyleSheet.create({
+  background: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  logoContainer: {
+    backgroundColor: "white",
+    borderRadius: 50,
+    padding: 20,
+    marginBottom: 20,
+    elevation: 5,
+  },
+  title: {
+    fontSize: 36,
+    fontWeight: "bold",
+    color: "#4CAF50",
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: "#333",
+    marginBottom: 30,
+  },
+  button: {
+    flexDirection: "row",
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 25,
+    elevation: 3,
+  },
+  buttonIcon: {
+    marginRight: 10,
+  },
+  buttonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+});
