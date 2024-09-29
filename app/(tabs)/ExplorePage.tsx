@@ -1,89 +1,130 @@
-import React, { useEffect, useState } from "react";
-import { Loader } from "@googlemaps/js-api-loader"; // Google Maps loader
+import React, { useState, useEffect } from "react";
+import { View, Text, FlatList, StyleSheet } from "react-native";
+import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
+import Geolocation from "react-native-geolocation-service";
 import { REACT_APP_GOOGLE_API_KEY } from "@/constants/apikeys";
 
+const mapContainerStyle = {
+  width: "100%",
+  height: "50vh",
+};
+
+const libraries = ["places"];
+
 const ExplorePage: React.FC = () => {
-  const [userLocation, setUserLocation] = useState<{
+  const [currentLocation, setCurrentLocation] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
   const [recyclingStations, setRecyclingStations] = useState<any[]>([]);
 
-  // Google Maps loader with API key
-  const loader = new Loader({
-    apiKey: REACT_APP_GOOGLE_API_KEY!,
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: REACT_APP_GOOGLE_API_KEY, // Add your API Key here
     libraries: ["places"],
   });
 
   useEffect(() => {
-    // Get user’s current location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (error) => {
-          console.error("Error getting user location", error);
-        }
-      );
-    }
+    // Get user's current location
+    Geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setCurrentLocation({ lat: latitude, lng: longitude });
+        fetchRecyclingStations(latitude, longitude); // Fetch recycling stations
+      },
+      (error) => {
+        console.error(error);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+  }, []);
 
-    // Load the map and places library
-    loader.load().then(() => {
-      if (userLocation) {
-        const map = new window.google.maps.Map(
-          document.getElementById("map")!,
-          {
-            center: userLocation,
-            zoom: 14,
-          }
-        );
+  const fetchRecyclingStations = async (lat: number, lng: number) => {
+    const googleMaps = (window as any).google.maps;
+    const map = new googleMaps.Map(document.createElement("div"));
+    const service = new googleMaps.places.PlacesService(map);
 
-        // Use Google Places API to search for nearby recycling stations
-        const service = new window.google.maps.places.PlacesService(map);
-        const request = {
-          location: new window.google.maps.LatLng(
-            userLocation.lat,
-            userLocation.lng
-          ),
-          radius: 5000, // Search within 5km radius
-          type: "recycling", // Type is now a string
-        };
+    const request = {
+      location: new googleMaps.LatLng(lat, lng),
+      radius: 10000, // 5 km radius
+      keyword: "recycling station",
+    };
 
-        // Perform the nearby search
-        service.nearbySearch(request, (results, status) => {
-          // Ensure results are not null and the status is OK
-          if (
-            status === window.google.maps.places.PlacesServiceStatus.OK &&
-            results
-          ) {
-            setRecyclingStations(results.slice(0, 5)); // Take top 5 results
-          } else {
-            console.error("No results found or Places Service Error", status);
-          }
-        });
+    service.nearbySearch(request, (results: any, status: any) => {
+      if (status === googleMaps.places.PlacesServiceStatus.OK) {
+        setRecyclingStations(results.slice(0, 5)); // Get top 5 results
+      } else {
+        console.error("PlacesService Error:", status);
       }
     });
-  }, [userLocation]);
+  };
+
+  if (loadError) return <Text>Error loading maps</Text>;
+  if (!isLoaded) return <Text>Loading maps...</Text>;
 
   return (
-    <div className="explore-page">
-      <div id="map" style={{ height: "400px", width: "100%" }} />
-      <div className="station-list">
-        <h3>Top 5 Nearby Recycling Stations</h3>
-        <ul>
+    <View style={styles.container}>
+      {currentLocation && (
+        <GoogleMap
+          mapContainerStyle={mapContainerStyle}
+          center={currentLocation}
+          zoom={14}
+        >
+          <Marker position={currentLocation} label="You" />
           {recyclingStations.map((station) => (
-            <li key={station.place_id}>
-              <strong>{station.name}</strong> - {station.vicinity}
-            </li>
+            <Marker
+              key={station.place_id}
+              position={{
+                lat: station.geometry.location.lat(),
+                lng: station.geometry.location.lng(),
+              }}
+              label={station.name}
+            />
           ))}
-        </ul>
-      </div>
-    </div>
+        </GoogleMap>
+      )}
+
+      <View style={styles.listContainer}>
+        <Text style={styles.header}>Top 5 Recycling Stations Near You</Text>
+        <FlatList
+          data={recyclingStations}
+          keyExtractor={(item) => item.place_id}
+          renderItem={({ item }) => (
+            <View style={styles.stationItem}>
+              <Text style={styles.stationName}>{item.name}</Text>
+              <Text>{item.vicinity}</Text>
+            </View>
+          )}
+        />
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 10,
+  },
+  mapContainer: {
+    width: "100%",
+    height: "50%",
+  },
+  listContainer: {
+    marginTop: 20,
+    flex: 1,
+  },
+  header: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  stationItem: {
+    marginBottom: 15,
+  },
+  stationName: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+});
 
 export default ExplorePage;

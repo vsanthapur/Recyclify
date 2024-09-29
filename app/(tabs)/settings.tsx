@@ -1,6 +1,6 @@
 import { StyleSheet } from "react-native";
-
 import { Text, View } from "@/components/Themed";
+import LogoutButton from "@/components/LogoutButton"; // Import the LogoutButton
 
 export default function SettingsTabScreen() {
   return (
@@ -17,6 +17,9 @@ export default function SettingsTabScreen() {
         <Text style={styles.infoText}>Username: johndoe</Text>
         <Text style={styles.infoText}>Email: johndoe@example.com</Text>
       </View>
+
+      {/* Add Logout Button here */}
+      <LogoutButton />
     </View>
   );
 }
