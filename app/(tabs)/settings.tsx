@@ -108,7 +108,7 @@ export default function AppMenu() {
       );
 
       const totalPoints = userImages.reduce(
-        (sum: number, img: any) => sum + (img.apiResponse.Points || 0),
+        (sum: number, img: any) => sum + (img.apiResponse.points || 0),
         0
       );
       setUserPoints(totalPoints);

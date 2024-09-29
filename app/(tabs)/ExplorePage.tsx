@@ -1,8 +1,7 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import { GoogleMap, useLoadScript, Marker } from "@react-google-maps/api";
 import { REACT_APP_GOOGLE_API_KEY } from "@/constants/apikeys";
+import { Alert, ActivityIndicator, View } from "react-native";
 
 // Replace with your actual Google Maps API key
 const GOOGLE_MAPS_API_KEY = REACT_APP_GOOGLE_API_KEY;
@@ -70,6 +69,7 @@ export default function RecyclingLocator() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [loading, setLoading] = useState(true); // Add loading state for station data
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -77,7 +77,7 @@ export default function RecyclingLocator() {
   });
 
   useEffect(() => {
-    if (navigator.geolocation) {
+    if (isLoaded && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
@@ -86,15 +86,19 @@ export default function RecyclingLocator() {
         },
         (error) => {
           console.error("Error getting location:", error);
+          setLoading(false); // Stop loading if there's an error
         }
       );
-    } else {
-      console.error("Geolocation is not supported by this browser.");
     }
-  }, []);
+  }, [isLoaded]); // Only run when isLoaded changes
 
   const fetchRecyclingStations = async (lat: number, lng: number) => {
-    const googleMaps = (window as any).google.maps;
+    if (!window.google || !window.google.maps) {
+      console.error("Google Maps API is not loaded.");
+      return;
+    }
+
+    const googleMaps = window.google.maps;
     const map = new googleMaps.Map(document.createElement("div"));
     const service = new googleMaps.places.PlacesService(map);
 
@@ -110,6 +114,7 @@ export default function RecyclingLocator() {
       } else {
         console.error("PlacesService Error:", status);
       }
+      setLoading(false); // Stop loading after fetching data
     });
   };
 
@@ -122,7 +127,12 @@ export default function RecyclingLocator() {
 
   if (loadError)
     return <div style={styles.loadingText}>Error loading maps</div>;
-  if (!isLoaded) return <div style={styles.loadingText}>Loading maps...</div>;
+  if (!isLoaded || loading)
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
 
   return (
     <div style={styles.container}>

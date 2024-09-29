@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { Tabs, useRouter, Link } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { Pressable, ActivityIndicator, View } from "react-native";
-import Colors from "@/constants/Colors";
-import { useColorScheme } from "@/components/useColorScheme"; // Adjusted hook usage
-import { useClientOnlyValue } from "@/components/useClientOnlyValue"; // Ensuring stable usage
+import { ActivityIndicator, View, StyleSheet } from "react-native";
+import { useColorScheme } from "@/components/useColorScheme";
+import { useClientOnlyValue } from "@/components/useClientOnlyValue";
+
+const LIGHT_GREEN = "#76C776";
+const WHITE = "#FFFFFF";
 
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>["name"];
@@ -15,102 +17,110 @@ function TabBarIcon(props: {
 }
 
 export default function TabLayout() {
-  const [loading, setLoading] = useState(true); // To manage loading state
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // To track if the user is logged in
+  const [loading, setLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const colorScheme = useColorScheme();
-  const router = useRouter(); // Router for explicit navigation
+  const router = useRouter();
 
-  // Ensuring hooks are called in a stable order, even when loading
-  const headerShown = useClientOnlyValue(false, true); // Ensuring this is not conditional
+  const headerShown = useClientOnlyValue(false, true);
 
-  // Check login status when the component mounts
   useEffect(() => {
     const checkLoginStatus = async () => {
       const token = await AsyncStorage.getItem("accessToken");
       console.log("Token from AsyncStorage:", token);
 
       if (token) {
-        setIsLoggedIn(true); // User is logged in
+        setIsLoggedIn(true);
       } else {
-        // Make sure to navigate only when the component is mounted
         if (router) {
           router.replace("/GoogleLogin");
         }
       }
-      setLoading(false); // Stop the loading indicator
+      setLoading(false);
     };
 
     checkLoginStatus();
   }, [router]);
 
   if (loading) {
-    // Show loading spinner while checking the login status
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={LIGHT_GREEN} />
       </View>
     );
   }
 
-  // If logged in, render the tab layout
   if (isLoggedIn) {
     return (
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
-          headerShown: headerShown, // Use the stable hook result here
+          tabBarStyle: {
+            backgroundColor: LIGHT_GREEN,
+          },
+          tabBarActiveTintColor: WHITE,
+          tabBarInactiveTintColor: "#f0f0f0",
+          headerStyle: {
+            backgroundColor: LIGHT_GREEN,
+          },
+          headerTintColor: WHITE,
+          headerShown: headerShown,
         }}
       >
         <Tabs.Screen
           name="charts"
           options={{
-            title: " ",
+            title: "Charts",
             tabBarIcon: ({ color }) => (
               <TabBarIcon name="bar-chart" color={color} />
-            ),
-            headerRight: () => (
-              <Link href="/modal" asChild>
-                <Pressable>
-                  {({ pressed }) => (
-                    <FontAwesome
-                      name="info-circle"
-                      size={25}
-                      color={Colors[colorScheme ?? "light"].text}
-                      style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                    />
-                  )}
-                </Pressable>
-              </Link>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: " ",
-            tabBarIcon: ({ color }) => (
-              <TabBarIcon name="camera" color={color} />
             ),
           }}
         />
         <Tabs.Screen
           name="ExplorePage"
           options={{
-            title: " ",
+            title: "Explore",
             tabBarIcon: ({ color }) => <TabBarIcon name="map" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: "Camera",
+            tabBarIcon: ({ color }) => (
+              <TabBarIcon name="camera" color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="leaderboard"
+          options={{
+            title: "Leaderboard",
+            tabBarIcon: ({ color }) => (
+              <TabBarIcon name="trophy" color={color} />
+            ),
           }}
         />
         <Tabs.Screen
           name="settings"
           options={{
-            title: " ",
-            tabBarIcon: ({ color }) => <TabBarIcon name="cog" color={color} />, // You can change the icon here
+            title: "Settings",
+            tabBarIcon: ({ color }) => (
+              <TabBarIcon name="user" color={color} />
+            ),
           }}
         />
       </Tabs>
     );
   }
 
-  // If not logged in, return null (router will have already redirected)
   return null;
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: WHITE,
+  },
+});

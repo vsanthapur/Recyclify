@@ -48,7 +48,6 @@ const Charts: React.FC = () => {
           const userInfo = await userInfoResponse.json();
           setEmail(userInfo.email);
 
-          // Use axios to fetch recycling data from your server using POST request
           const response = await axios.post(
             "http://localhost:8081/recycling-data",
             {
@@ -67,7 +66,7 @@ const Charts: React.FC = () => {
       } catch (error) {
         console.error("Error fetching user info or data:", error);
       } finally {
-        setLoading(false); // Set loading to false once data is fetched
+        setLoading(false);
       }
     };
 
@@ -90,26 +89,28 @@ const Charts: React.FC = () => {
     );
   }
 
-  // 1. Filter for recyclable items (for the average score calculation)
   const recyclableItems = data.filter(
-    (item) => item.apiResponse.recyclable // Accessing apiResponse.recyclable
+    (item) => item.apiResponse && item.apiResponse.recyclable
   );
 
-  // 2. Calculate the total and average recycling score for recyclable items only
   const totalPoints = recyclableItems.reduce(
-    (sum, item) => sum + item.apiResponse.points, // Accessing apiResponse.points
+    (sum, item) =>
+      item.apiResponse && item.apiResponse.points
+        ? sum + item.apiResponse.points
+        : sum,
     0
   );
+
   const averageScore =
     recyclableItems.length > 0
       ? (totalPoints / recyclableItems.length).toFixed(1)
-      : "0"; // One decimal precision
+      : "0";
 
-  // 3. Count the number of recyclable and non-recyclable items
+
   const recyclableCount = recyclableItems.length;
   const nonRecyclableCount = data.length - recyclableCount;
 
-  // 4. Recyclable vs Non-Recyclable Data for Bar Chart
+
   const recyclableData = [
     {
       value: recyclableCount,
@@ -123,7 +124,7 @@ const Charts: React.FC = () => {
     },
   ];
 
-  // 5. Materials breakdown (taking care of undefined materials)
+
   const materialsData = data
     .flatMap((item) =>
       item.apiResponse.materials ? item.apiResponse.materials : []
@@ -133,7 +134,7 @@ const Charts: React.FC = () => {
       return acc;
     }, {} as Record<string, number>);
 
-  // Convert the material breakdown into pie chart data
+
   const materialsPieData = Object.entries(materialsData).map(
     ([material, count], index) => ({
       value: Number(count),
@@ -144,16 +145,13 @@ const Charts: React.FC = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Title at the top */}
       <Text style={styles.mainTitle}>Your Recycling Stats</Text>
-      {/* Display Average Recycling Score */}
       <View style={styles.scoreContainer}>
         <View style={styles.scoreCircle}>
           <Text style={styles.scoreValue}>{averageScore}</Text>
         </View>
         <Text style={styles.scoreLabel}>Your Recycling Score</Text>
       </View>
-      {/* Bar Chart: Recyclable vs Non-Recyclable */}
       <View style={styles.chartContainer}>
         <Text style={styles.chartTitle}>Recyclable vs Non-Recyclable</Text>
         <View style={{ alignItems: "center" }}>
@@ -177,7 +175,6 @@ const Charts: React.FC = () => {
           />
         </View>
       </View>
-      {/* Pie Chart: Materials Breakdown */}
       <View style={styles.chartContainer}>
         <Text style={styles.chartTitle}>Materials Breakdown</Text>
         <View style={{ alignItems: "center" }}>
@@ -205,8 +202,7 @@ const Charts: React.FC = () => {
           </View>
         </View>
       </View>
-      {/* Past Posts Component: Display user's past recycling data */}
-      <PastPosts posts={data} /> {/* Passing the data to PastPosts */}
+      <PastPosts posts={data} />
     </ScrollView>
   );
 };

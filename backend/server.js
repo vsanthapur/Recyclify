@@ -14,8 +14,7 @@ app.use(cors());
 app.use((req, res, next) => {
   const contentLength = req.headers["content-length"];
   console.log(
-    `Incoming Request: ${req.method} ${req.path} - Data size: ${
-      contentLength || "0"
+    `Incoming Request: ${req.method} ${req.path} - Data size: ${contentLength || "0"
     } bytes`
   );
   next();
@@ -119,19 +118,18 @@ app.get("/leaderboard", async (req, res) => {
     const imagesCollection = database.collection("images");
 
     const users = await usersCollection.find({}).toArray();
-
     const leaderboard = [];
 
     for (const user of users) {
-      const userImages = await imagesCollection
-        .find({ owner: user.email })
-        .toArray();
+
+      const userImages = await imagesCollection.find({ owner: user.email }).toArray();
 
       const totalRecyclable = userImages.filter(
-        (img) => img.apiResponse.recyclable
+        (img) => img.apiResponse && img.apiResponse.recyclable
       ).length;
+
       const totalPoints = userImages.reduce(
-        (sum, img) => sum + img.apiResponse.Points,
+        (sum, img) => (img.apiResponse && img.apiResponse.points ? sum + img.apiResponse.points : sum),
         0
       );
 
@@ -151,6 +149,7 @@ app.get("/leaderboard", async (req, res) => {
     await client.close();
   }
 });
+
 
 app.post("/login", async (req, res) => {
   const { email, name } = req.body;
@@ -210,23 +209,22 @@ app.post("/upload-image", async (req, res) => {
 });
 
 app.post("/recycling-data", async (req, res) => {
-  const { email } = req.body; // Extract the email from the request body
+  const { email } = req.body;
 
   if (!email) {
     return res.status(400).json({ message: "Email is required" });
   }
 
   try {
-    // Connect to MongoDB
     await client.connect();
-    const database = client.db("DB"); // Replace with your actual database name
+    const database = client.db("DB");
     const imagesCollection = database.collection("images");
 
-    // Find documents where the owner is the specified email
-    const results = await imagesCollection.find({ owner: email }).toArray(); // Convert the result to an array
+
+    const results = await imagesCollection.find({ owner: email }).toArray();
 
     if (results.length > 0) {
-      res.status(200).json(results); // Return the full documents
+      res.status(200).json(results);
     } else {
       res.status(404).json({ message: "No data found for this email" });
     }

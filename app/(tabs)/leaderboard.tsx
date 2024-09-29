@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { FaCrown } from "react-icons/fa";
 import axios from "axios";
@@ -24,6 +25,7 @@ export default function Leaderboard() {
     "totalPoints"
   );
   const [users, setUsers] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     axios
@@ -39,19 +41,29 @@ export default function Leaderboard() {
         });
 
         setUsers(usersWithAvatars);
+        setLoading(false);
       })
       .catch((error) => {
         console.error("Error fetching leaderboard data:", error);
+        setLoading(false);
       });
   }, []);
 
   const sortedUsers = [...users].sort((a, b) => b[sortBy] - a[sortBy]);
 
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      {/* <View style={styles.header}>
         <Text style={styles.title}>Leaderboard</Text>
-      </View>
+      </View> */}
       <View style={styles.content}>
         <View style={styles.filterButtons}>
           <TouchableOpacity
@@ -231,5 +243,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#4CAF50",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "#666",
   },
 });

@@ -1,80 +1,84 @@
-"use client";
-
 import React, { useState, useRef, useEffect, CSSProperties } from "react";
 import { FaCamera, FaUpload, FaUndo, FaCheck } from "react-icons/fa";
-import {
-  Alert,
-  ActivityIndicator,
-  View,
-  SectionListComponent,
-} from "react-native";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Alert, ActivityIndicator, View } from "react-native";
 import { OPEN_AI_API_KEY } from "@/constants/apikeys";
 
 const styles: { [key: string]: CSSProperties } = {
   container: {
-    width: "100%",
-    maxWidth: "400px",
-    margin: "0 auto",
-    backgroundColor: "white",
-    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-    borderRadius: "8px",
+    width: "100vw",
+    height: "100vh",
+    margin: "0",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
     overflow: "hidden",
+    position: "relative",
   },
   content: {
-    padding: "24px",
+    width: "100%",
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
   },
   resultBanner: {
-    marginBottom: "16px",
-    padding: "8px",
+    width: "100%",
+    padding: "16px",
     textAlign: "center",
     color: "white",
     fontWeight: "bold",
     borderRadius: "4px",
+    position: "absolute",
+    top: 0,
   },
   video: {
     width: "100%",
-    borderRadius: "4px",
+    height: "100%",
+    objectFit: "cover",
   },
   buttonContainer: {
-    position: "relative",
-    marginTop: "16px",
     display: "flex",
     justifyContent: "center",
+    alignItems: "center",
+    position: "absolute",
+    bottom: "80%",
+    gap: "16px",
   },
   iconButton: {
     backgroundColor: "#22c55e",
     color: "white",
     border: "none",
     borderRadius: "50%",
-    padding: "12px",
+    padding: "16px",
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    fontSize: "20px",
     transition: "background-color 0.3s",
-  },
-  captureButton: {
-    position: "absolute",
-    bottom: "16px",
-    left: "50%",
-    transform: "translateX(-50%)",
-  },
-  outlineButton: {
-    backgroundColor: "white",
-    color: "#22c55e",
-    border: "2px solid #22c55e",
   },
   image: {
     width: "100%",
-    marginBottom: "16px",
-    borderRadius: "4px",
+    height: "100%",
+    objectFit: "cover",
   },
-  buttonGroup: {
+  responseSection: {
+    width: "100%",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    textAlign: "center",
+    color: "#333",
+    fontSize: "16px",
+    padding: "10px",
+    overflowY: "auto",
+    position: "absolute",
+    bottom: 0,
+    maxHeight: "40%",
     display: "flex",
-    justifyContent: "center",
-    gap: "16px",
+    flexDirection: "column",
   },
 };
 
@@ -88,34 +92,11 @@ export default function RecyclableChecker() {
   const [points, setPoints] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
-  const [email, setEmail] = useState<string | null>(null);
-  const [name, setName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Function to retrieve session data (email, name)
-  const getSession = async () => {
-    try {
-      const accessToken = await AsyncStorage.getItem("accessToken");
-      if (accessToken) {
-        const userInfoResponse = await fetch(
-          "https://www.googleapis.com/userinfo/v2/me",
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          }
-        );
-        const userInfo = await userInfoResponse.json();
-        setEmail(userInfo.email);
-        setName(userInfo.name);
-      }
-    } catch (error) {
-      console.error("Error fetching session:", error);
-    }
-  };
-
   useEffect(() => {
     handleCameraAccess();
-    getSession(); // Fetch session when component mounts
   }, []);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,8 +105,8 @@ export default function RecyclableChecker() {
       const reader = new FileReader();
       reader.onload = (e) => {
         const imageDataUrl = e.target?.result as string;
-        setImage(imageDataUrl); // Set the image for display
-        convertToBase64(imageDataUrl); // Convert to base64 and setBase64Image
+        setImage(imageDataUrl);
+        convertToBase64(imageDataUrl);
       };
       reader.readAsDataURL(file);
     }
@@ -151,7 +132,6 @@ export default function RecyclableChecker() {
       canvas.getContext("2d")?.drawImage(videoRef.current, 0, 0);
       setImage(canvas.toDataURL("image/jpeg"));
       convertToBase64(canvas.toDataURL("image/jpeg"));
-      // Stop the video stream
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach((track) => track.stop());
       setIsCameraReady(false);
@@ -171,14 +151,14 @@ export default function RecyclableChecker() {
 
   const handleConfirm = async () => {
     if (base64Image) {
-      setLoading(true); // Start loading spinner
+      setLoading(true);
       try {
         const gptResponse = await analyzeImageWithOpenAI(base64Image);
-        await uploadImageToBackend(base64Image, gptResponse);
+        console.log(gptResponse);
       } catch (error) {
         Alert.alert("Error");
       } finally {
-        setLoading(false); // Stop loading spinner
+        setLoading(false);
       }
     } else {
       Alert.alert("No image", "Please select or take an image first.");
@@ -220,7 +200,7 @@ Respond in this JSON format:
 }
 The score (1-10) reflects the recycling impact: larger items = higher impact, smaller = lower. Be witty in the description.
 If the user uploads irrelevant items (like a selfie), return "recyclable": false, "materials": "human", and add a funny comment like "You are not recyclable."
-Return **only** JSON; no extra text.`;
+Return **only** JSON; no extra text. I repeat do not say something like json first or anything just start with { end with }`;
 
     const payload = {
       model: "gpt-4o-mini",
@@ -271,30 +251,7 @@ Return **only** JSON; no extra text.`;
     }
   };
 
-  const uploadImageToBackend = async (base64Image: any, gptResponse: any) => {
-    try {
-      const response = await axios.post("http://localhost:8081/upload-image", {
-        email: email,
-        base64Image: base64Image,
-        apiResponse: gptResponse,
-      });
-
-      if (response.data.message === "Image uploaded successfully") {
-        console.log(
-          "Image and GPT response uploaded successfully",
-          response.data.image
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Error uploading image and GPT response to backend:",
-        error
-      );
-    }
-  };
-
   if (loading) {
-    // Show loading spinner while checking the OpenAI API response
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
@@ -305,68 +262,27 @@ Return **only** JSON; no extra text.`;
   return (
     <div style={styles.container}>
       <div style={styles.content}>
-        {isRecyclable !== null && (
-          <div
-            style={{
-              ...styles.resultBanner,
-              backgroundColor: isRecyclable ? "#22c55e" : "#ef4444",
-            }}
-          >
-            {isRecyclable ? "Recyclable" : "Not Recyclable"}
-          </div>
-        )}
-
-        {item && (
-          <p>
-            <strong>Item: </strong>
-            {item}
-          </p>
-        )}
-
-        {description && (
-          <p>
-            <strong>Description: </strong>
-            {description}
-          </p>
-        )}
-
-        {materials.length > 0 && (
-          <p>
-            <strong>Materials: </strong>
-            {materials.join(", ")}
-          </p>
-        )}
-
-        {points !== null && (
-          <p>
-            <strong>Recycling Points: </strong>
-            {points}
-          </p>
-        )}
-
         {!image ? (
           <>
-            <div style={{ position: "relative" }}>
-              <video ref={videoRef} style={styles.video} autoPlay playsInline />
-              {isCameraReady && (
+            <video ref={videoRef} style={styles.video} autoPlay playsInline />
+            {isCameraReady && (
+              <div style={styles.buttonContainer}>
                 <button
-                  style={{ ...styles.iconButton, ...styles.captureButton }}
+                  style={styles.iconButton}
                   onClick={handleCapture}
                   aria-label="Take Picture"
                 >
                   <FaCamera size={24} />
                 </button>
-              )}
-            </div>
-            <div style={styles.buttonContainer}>
-              <button
-                style={styles.iconButton}
-                onClick={() => fileInputRef.current?.click()}
-                aria-label="Upload File"
-              >
-                <FaUpload size={24} />
-              </button>
-            </div>
+                <button
+                  style={styles.iconButton}
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-label="Upload File"
+                >
+                  <FaUpload size={24} />
+                </button>
+              </div>
+            )}
             <input
               type="file"
               ref={fileInputRef}
@@ -378,14 +294,7 @@ Return **only** JSON; no extra text.`;
         ) : (
           <>
             <img src={image} alt="Captured" style={styles.image} />
-            <div style={styles.buttonGroup}>
-              <button
-                style={{ ...styles.iconButton, ...styles.outlineButton }}
-                onClick={handleRetake}
-                aria-label="Retake"
-              >
-                <FaUndo size={24} />
-              </button>
+            <div style={styles.buttonContainer}>
               <button
                 style={styles.iconButton}
                 onClick={handleConfirm}
@@ -393,10 +302,60 @@ Return **only** JSON; no extra text.`;
               >
                 <FaCheck size={24} />
               </button>
+              <button
+                style={styles.iconButton}
+                onClick={handleRetake}
+                aria-label="Reset"
+              >
+                <FaUndo size={24} />
+              </button>
             </div>
           </>
         )}
+
+        {isRecyclable !== null && (
+          <div
+            style={{
+              ...styles.resultBanner,
+              backgroundColor: isRecyclable ? "#22c55e" : "#ef4444",
+            }}
+          >
+            {isRecyclable ? "Recyclable" : "Not Recyclable"}
+          </div>
+        )}
       </div>
+
+      {isRecyclable !== null && (
+        <div style={styles.responseSection}>
+          {item && (
+            <p>
+              <strong>Item: </strong>
+              {item}
+            </p>
+          )}
+
+          {description && (
+            <p>
+              <strong>Description: </strong>
+              {description}
+            </p>
+          )}
+
+          {materials.length > 0 && (
+            <p>
+              <strong>Materials: </strong>
+              {materials.join(", ")}
+            </p>
+          )}
+
+          {points !== null && (
+            <p>
+              <strong>Recycling Points: </strong>
+              {points}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
