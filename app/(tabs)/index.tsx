@@ -256,7 +256,7 @@ export default function RecyclableChecker() {
       const response = await axios.post("http://localhost:8081/upload-image", {
         email: email,
         base64Image: base64Image,
-        apiResponse: gptResponse, // Add the GPT response here
+        apiResponse: gptResponse,
       });
 
       if (response.data.message === "Image uploaded successfully") {
