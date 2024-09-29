@@ -1,93 +1,191 @@
-import React, { useEffect, useState } from "react";
-import { StyleSheet, Button, Image, View, Alert } from "react-native";
-import { Text } from "@/components/Themed";
-import * as ImagePicker from "expo-image-picker";
+import React, { useState, useRef } from "react";
+import { View, Button, Image, Text, Platform, StyleSheet } from "react-native";
+import { launchCamera, launchImageLibrary } from "react-native-image-picker";
 
-export default function TabTwoScreen() {
+const UploadOrTakePicture = () => {
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Request camera and media library permissions when the component mounts
-  useEffect(() => {
-    (async () => {
-      const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
-      const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (cameraStatus !== 'granted') {
-        Alert.alert('Camera permission is required!');
-      }
-
-      if (libraryStatus !== 'granted') {
-        Alert.alert('Media library permission is required!');
-      }
-    })();
-  }, []);
-
-  // Function to handle picking an image from the library
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
+  // Reset image and video feed
+  const handleRetake = () => {
+    setImageUri(null); // Reset the image
+    if (videoRef.current && Platform.OS === "web") {
+      handleStartCameraWeb(); // Restart camera on web if it was previously used
     }
   };
 
-  // Function to handle taking a picture with the camera
-  const takePhoto = async () => {
-    let result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
+  // === Mobile handlers ===
+  const handleTakePictureMobile = () => {
+    launchCamera({ mediaType: "photo", saveToPhotos: true }, (response) => {
+      if (response.didCancel) {
+        console.log("User cancelled image picker");
+      } else if (response.errorCode) {
+        console.log("Error: ", response.errorMessage);
+      } else if (response.assets && response.assets[0].uri) {
+        setImageUri(response.assets[0].uri); // Save the image URI for further processing
+      }
     });
+  };
 
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
+  const handleChooseFileMobile = () => {
+    launchImageLibrary({ mediaType: "photo" }, (response) => {
+      if (response.didCancel) {
+        console.log("User cancelled file picker");
+      } else if (response.errorCode) {
+        console.log("Error: ", response.errorMessage);
+      } else if (response.assets && response.assets[0].uri) {
+        setImageUri(response.assets[0].uri); // Save the file URI for further processing
+      }
+    });
+  };
+
+  // === Web handlers ===
+  const handleStartCameraWeb = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+    }
+  };
+
+  const handleTakePictureWeb = () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext("2d");
+      if (context) {
+        context.drawImage(
+          videoRef.current,
+          0,
+          0,
+          canvasRef.current.width,
+          canvasRef.current.height
+        );
+        const imageUrl = canvasRef.current.toDataURL("image/png");
+        setImageUri(imageUrl); // Save the captured image for further processing
+        if (videoRef.current.srcObject) {
+          const tracks = (
+            videoRef.current.srcObject as MediaStream
+          ).getTracks();
+          tracks.forEach((track) => track.stop()); // Stop the video stream
+        }
+      }
+    }
+  };
+
+  const handleChooseFileWeb = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const uri = URL.createObjectURL(file); // Convert file to a local object URL
+      setImageUri(uri);
     }
   };
 
   return (
     <View style={styles.container}>
-      {imageUri && (
-        <Image source={{ uri: imageUri }} style={styles.image} />
+      {/* Web */}
+      {Platform.OS === "web" ? (
+        <>
+          {!imageUri && (
+            <>
+              <video ref={videoRef} style={styles.video} />
+              <canvas
+                ref={canvasRef}
+                style={{ display: "none" }}
+                width={300}
+                height={300}
+              />
+            </>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleChooseFileWeb}
+            style={styles.input}
+          />
+        </>
+      ) : (
+        <>
+          {/* Mobile */}
+          {!imageUri && (
+            <>
+              <Button
+                title="Take a Picture"
+                onPress={handleTakePictureMobile}
+              />
+              <Button
+                title="Choose from Library"
+                onPress={handleChooseFileMobile}
+              />
+            </>
+          )}
+        </>
       )}
-      <Text style={styles.title}>Choose an action</Text>
+
+      {/* Display selected image */}
+      {imageUri && (
+        <>
+          <Text style={styles.text}>Selected Image:</Text>
+          <Image source={{ uri: imageUri }} style={styles.image} />
+        </>
+      )}
+
+      {/* Buttons positioned at the bottom */}
       <View style={styles.buttonContainer}>
-        <Button title="Choose from Library" onPress={pickImage} />
-        <Button title="Take a Picture" onPress={takePhoto} />
+        {!imageUri ? (
+          <>
+            {Platform.OS === "web" && !imageUri && (
+              <>
+                <Button title="Access Camera" onPress={handleStartCameraWeb} />
+                <Button title="Take Picture" onPress={handleTakePictureWeb} />
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <Button title="Retake" onPress={handleRetake} />
+          </>
+        )}
       </View>
     </View>
   );
-}
+};
 
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    justifyContent: "space-between", // Pushes the buttons to the bottom
-    padding: 20, // Add padding for better spacing
   },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginTop: 275, // Increased margin to move the title down
-    marginBottom: 10, // Keeps spacing between title and buttons
-  },
-  buttonContainer: {
-    flexDirection: "row", // Align buttons side by side
-    justifyContent: "space-between",
-    width: "80%", // Adjust width as needed
+  video: {
+    width: 300,
+    height: 300,
+    marginTop: 10,
   },
   image: {
-    width: 300, // Set desired width
-    height: 300, // Set desired height
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 10,
-    marginTop: 75,  
-    marginBottom: 20, // Add margin to the bottom of the image
+    width: 200,
+    height: 200,
+    marginTop: 20,
+  },
+  text: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  buttonContainer: {
+    position: "absolute",
+    bottom: 30,
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+  },
+  input: {
+    marginTop: 10,
   },
 });
+
+export default UploadOrTakePicture;
