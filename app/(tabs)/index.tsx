@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, CSSProperties } from "react";
 import { FaCamera, FaUpload, FaUndo, FaCheck } from "react-icons/fa";
 import { Alert, ActivityIndicator, View } from "react-native";
 import { OPEN_AI_API_KEY } from "@/constants/apikeys";
+import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const styles: { [key: string]: CSSProperties } = {
   container: {
@@ -83,6 +85,7 @@ const styles: { [key: string]: CSSProperties } = {
 };
 
 export default function RecyclableChecker() {
+  const [email, setEmail] = useState();
   const [image, setImage] = useState<string | null>(null);
   const [base64Image, setBase64Image] = useState<string | null>(null);
   const [isRecyclable, setIsRecyclable] = useState<boolean | null>(null);
@@ -97,6 +100,7 @@ export default function RecyclableChecker() {
 
   useEffect(() => {
     handleCameraAccess();
+    getSession();
   }, []);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,11 +153,53 @@ export default function RecyclableChecker() {
     setItem(null);
   };
 
+  const uploadImageToBackend = async (base64Image: any, gptResponse: any) => {
+    try {
+      const response = await axios.post("http://localhost:8081/upload-image", {
+        email: email,
+        base64Image: base64Image,
+        apiResponse: gptResponse,
+      });
+
+      if (response.data.message === "Image uploaded successfully") {
+        console.log(
+          "Image and GPT response uploaded successfully",
+          response.data.image
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Error uploading image and GPT response to backend:",
+        error
+      );
+    }
+  };
+
+  const getSession = async () => {
+    try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      if (accessToken) {
+        const userInfoResponse = await fetch(
+          "https://www.googleapis.com/userinfo/v2/me",
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+
+        const userInfo = await userInfoResponse.json();
+        setEmail(userInfo.email);
+      }
+    } catch (error) {
+      console.error("Error fetching session:", error);
+    }
+  };
+
   const handleConfirm = async () => {
     if (base64Image) {
       setLoading(true);
       try {
         const gptResponse = await analyzeImageWithOpenAI(base64Image);
+        uploadImageToBackend(base64Image, gptResponse)
         console.log(gptResponse);
       } catch (error) {
         Alert.alert("Error");
